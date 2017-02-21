@@ -53,6 +53,11 @@ class Rough_Front(object):
         self.weights = np.zeros(num_strains, dtype=np.double) # The weight to draw each type of strain
         self.strain_array = np.arange(num_strains, dtype=np.int) # The name of every strain; i.e. 0->num_strains - 1
 
+        # Get the maximum possible number of iterations...don't want to run longer than that!
+        self.max_iterations = np.sum(self.lattice == -1)
+        self.iterations_run = 0
+
+
     def get_nearby_empty_locations(self, cur_loc):
 
         cur_x = cur_loc[0]
@@ -112,61 +117,68 @@ class Rough_Front(object):
         return choices_to_occupy
 
     def run(self, num_iterations):
+        if self.iterations_run < self.max_iterations:
+            for iteration in range(num_iterations):
+                # Choose what type of cell to divide
 
-        for iteration in range(num_iterations):
-            # Choose what type of cell to divide
+                sum_of_weights = 0
+                for strain in range(self.num_strains):
+                    cur_weight = self.N[strain] * self.v[strain]
 
-            sum_of_weights = 0
-            for strain in range(self.num_strains):
-                cur_weight = self.N[strain] * self.v[strain]
+                    self.weights[strain] = cur_weight
+                    sum_of_weights += cur_weight
+                normalized_weights = self.weights / sum_of_weights
 
-                self.weights[strain] = cur_weight
-                sum_of_weights += cur_weight
-            normalized_weights = self.weights / sum_of_weights
+                chosen_type = np.random.choice(self.strain_array, p=normalized_weights)
 
-            chosen_type = np.random.choice(self.strain_array, p=normalized_weights)
+                # Now that we have the type to choose, choose that type at random
+                random_index = np.random.randint(0, self.N[chosen_type])
 
-            # Now that we have the type to choose, choose that type at random
-            random_index = np.random.randint(0, self.N[chosen_type])
+                cur_loc = self.strain_positions[chosen_type][random_index]
 
-            cur_loc = self.strain_positions[chosen_type][random_index]
+                # Check where you can reproduce
+                num_choices, choices_to_occupy = self.get_nearby_empty_locations(cur_loc)
 
-            # Check where you can reproduce
-            num_choices, choices_to_occupy = self.get_nearby_empty_locations(cur_loc)
+                if num_choices == 0:
+                    print 'Something bad has happened...'
+                    print cur_loc
+                    print cur_loc[1] * self.nx + cur_loc[0]
 
-            if num_choices == 0:
-                print 'Something bad has happened...'
-                print cur_loc
-                print cur_loc[1] * self.nx + cur_loc[0]
+                random_choice = np.random.randint(0, num_choices)
+                new_loc = choices_to_occupy[random_choice]
 
-            random_choice = np.random.randint(0, num_choices)
-            new_loc = choices_to_occupy[random_choice]
+                # Now update the lattice
+                self.lattice[new_loc[0], new_loc[1]] = chosen_type
 
-            # Now update the lattice
-            self.lattice[new_loc[0], new_loc[1]] = chosen_type
+                # Uh oh... you have to check if *you* are on the interface now!
+                num_free, _ = self.get_nearby_empty_locations(new_loc)
+                if num_free != 0:
+                    new_label = new_loc[1] * self.nx + new_loc[0]
 
-            # Uh oh... you have to check if *you* are on the interface now!
-            num_free, _ = self.get_nearby_empty_locations(new_loc)
-            if num_free != 0:
-                new_label = new_loc[1] * self.nx + new_loc[0]
+                    self.strain_labels[chosen_type].append(new_label)
+                    self.strain_positions[chosen_type].append(new_loc)
+                    self.N[chosen_type] += 1
 
-                self.strain_labels[chosen_type].append(new_label)
-                self.strain_positions[chosen_type].append(new_loc)
-                self.N[chosen_type] += 1
+                # Now update who is on the edge of the interface.
+                # We have to check who is on the four squares around the interface
+                new_neighbors_loc = self.get_nearby_locations(new_loc)
 
-            # Now update who is on the edge of the interface.
-            # We have to check who is on the four squares around the interface
-            new_neighbors_loc = self.get_nearby_locations(new_loc)
+                for l in new_neighbors_loc:
+                    neighbor_id = self.lattice[l[0], l[1]]
+                    if neighbor_id != -1:
+                        two_d_index = l[1] * self.nx + l[0]
+                        if two_d_index in self.strain_labels[neighbor_id]:
+                            num_free, _ = self.get_nearby_empty_locations(l)
+                            if num_free == 0:
+                                # Remove from interface
+                                index_to_remove = self.strain_labels[neighbor_id].index(two_d_index)
+                                del self.strain_labels[neighbor_id][index_to_remove]
+                                del self.strain_positions[neighbor_id][index_to_remove]
+                                self.N[neighbor_id] -= 1
 
-            for l in new_neighbors_loc:
-                neighbor_id = self.lattice[l[0], l[1]]
-                if neighbor_id != -1:
-                    two_d_index = l[1] * self.nx + l[0]
-                    if two_d_index in self.strain_labels[neighbor_id]:
-                        num_free, _ = self.get_nearby_empty_locations(l)
-                        if num_free == 0:
-                            # Remove from interface
-                            index_to_remove = self.strain_labels[neighbor_id].index(two_d_index)
-                            del self.strain_labels[neighbor_id][index_to_remove]
-                            del self.strain_positions[neighbor_id][index_to_remove]
-                            self.N[neighbor_id] -= 1
+                self.iterations_run += 1
+                if self.iterations_run == self.max_iterations:
+                    print 'Ran for the maximum number of iterations! Done.'
+                    break
+        else:
+            print 'I already ran for the maximum number of iterations! Done.'
