@@ -24,7 +24,7 @@ class Rough_Front(object):
         else:
             self.ic = ic
 
-        self.lattice = -1*np.ones((self.ny, self.ny), dtype=np.int)
+        self.lattice = -1*np.ones((self.nx, self.ny), dtype=np.int)
         self.lattice[:, 0] = self.ic
 
         # Get the original location of the interface
