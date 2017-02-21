@@ -14,7 +14,7 @@ class Rough_Front(object):
         self.ny = ny # Dimension of the lattice in the y (column) direction
 
         self.num_strains = num_strains # Number of different strains in the simulation
-        if self.v is None:
+        if v is None:
             self.v = np.ones(num_strains, dtype=np.double) # Growth velocities of each strain
         else:
             self.v = v
