@@ -10,17 +10,17 @@ num_neighbors = 4
 class Rough_Front(object):
 
     def __init__(self, nx, ny, num_strains=2, ic = None, v=None):
-        self.nx = nx
-        self.ny = ny
+        self.nx = nx # Dimension of the lattice in the x (row) direction
+        self.ny = ny # Dimension of the lattice in the y (column) direction
 
-        self.num_strains = num_strains
+        self.num_strains = num_strains # Number of different strains in the simulation
         if self.v is None:
-            self.v = np.ones(num_strains, dtype=np.double)
+            self.v = np.ones(num_strains, dtype=np.double) # Growth velocities of each strain
         else:
             self.v = v
 
         if ic is None:
-            self.ic =  np.random.randint(0, num_strains, size=nx)
+            self.ic =  np.random.randint(0, num_strains, size=nx) # The initial condition of the lattice (along a line)
         else:
             self.ic = ic
 
@@ -110,7 +110,6 @@ class Rough_Front(object):
                 choices_to_occupy.append(np.array([streamed_x, streamed_y]))
 
         return choices_to_occupy
-
 
     def run(self, num_iterations):
 
