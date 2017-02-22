@@ -128,6 +128,7 @@ cdef class Rough_Front(object):
                     x_choices[temp_num_choices] = streamed_x
                     y_choices[temp_num_choices] = streamed_y
                     temp_num_choices += 1
+
         num_choices[0] = temp_num_choices
 
     cdef void get_nearby_locations(self, int cur_x, int cur_y,
@@ -182,10 +183,6 @@ cdef class Rough_Front(object):
             if cur_sum > rand_num:
                 return index
 
-    cdef gsl_rng_uniform_int_safe(self, int max):
-        print max
-        return gsl_rng_uniform_int(self.random_generator, max)
-
     def run(self, int num_iterations):
 
         cdef double[:] normalized_weights = self.weights.copy()
@@ -229,7 +226,7 @@ cdef class Rough_Front(object):
                 chosen_type = self.strain_array[choice_index]
 
                 # Now that we have the type to choose, choose that type at random
-                random_index = self.gsl_rng_uniform_int_safe(self.N[chosen_type])
+                random_index = gsl_rng_uniform_int(self.random_generator, self.N[chosen_type])
 
                 cur_loc_x = self.strain_positions_x[chosen_type][random_index]
                 cur_loc_y = self.strain_positions_y[chosen_type][random_index]
@@ -238,7 +235,7 @@ cdef class Rough_Front(object):
                 self.get_nearby_empty_locations(cur_loc_x, cur_loc_y,
                                                 &x_choices[0], &y_choices[0], &num_choices)
 
-                random_choice = self.gsl_rng_uniform_int_safe(num_choices)
+                random_choice = gsl_rng_uniform_int(self.random_generator, num_choices)
                 new_loc_x = x_choices[random_choice]
                 new_loc_y = y_choices[random_choice]
 
