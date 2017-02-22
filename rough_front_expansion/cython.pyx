@@ -1,4 +1,5 @@
 import numpy as np
+cimport numpy as np
 import skimage as ski
 import skimage.morphology
 
@@ -49,7 +50,7 @@ cdef class Rough_Front(object):
         interface = grown != background
         interface = np.where(interface)
 
-        interface_loc = np.stack(interface, axis=1)
+        interface_loc = np.stack(interface, axis=1).astype(np.int32)
 
         self.strain_positions = [] # Locations of each type of strain
         self.strain_labels = [] # A unique, position-based label for each strain
@@ -74,7 +75,7 @@ cdef class Rough_Front(object):
         self.iterations_run = 0
 
 
-    def get_nearby_empty_locations(self, cur_loc):
+    cdef get_nearby_empty_locations(self, int[:] cur_loc):
 
         cdef int cur_x = cur_loc[0]
         cdef int cur_y = cur_loc[1]
@@ -83,6 +84,9 @@ cdef class Rough_Front(object):
         cdef list choices_to_occupy = []
 
         cdef int n
+        cdef int cur_cx, cur_cy, streamed_x, streamed_y
+        cdef int neighboring_strain
+
         for n in range(num_neighbors):
             cur_cx = cx[n]
             cur_cy = cy[n]
@@ -103,17 +107,18 @@ cdef class Rough_Front(object):
 
                 if neighboring_strain == -1:
                     num_choices += 1
-                    choices_to_occupy.append(np.array([streamed_x, streamed_y]))
+                    choices_to_occupy.append(np.array([streamed_x, streamed_y], dtype=np.int32))
 
         return num_choices, choices_to_occupy
 
-    def get_nearby_locations(self, cur_loc):
+    cdef get_nearby_locations(self, int[:] cur_loc):
 
-        cur_x = cur_loc[0]
-        cur_y = cur_loc[1]
+        cdef int cur_x = cur_loc[0]
+        cdef int cur_y = cur_loc[1]
 
         choices_to_occupy = []
 
+        cdef int n, cur_cx, cur_cy, streamed_x, streamed_y
         for n in range(num_neighbors):
             cur_cx = cx[n]
             cur_cy = cy[n]
@@ -129,12 +134,28 @@ cdef class Rough_Front(object):
                 streamed_x = self.nx - 1
 
             if not (streamed_y == self.ny or streamed_y == -1):
-                choices_to_occupy.append(np.array([streamed_x, streamed_y]))
+                choices_to_occupy.append(np.array([streamed_x, streamed_y], dtype=np.int32))
 
         return choices_to_occupy
 
-    def run(self, num_iterations):
-        normalized_weights = self.weights.copy()
+    def run(self, int num_iterations):
+
+        cdef double[:] normalized_weights = self.weights.copy()
+        cdef int iteration
+        cdef double sum_of_weights
+        cdef int strain
+        cdef double cur_weight
+        cdef int chosen_type
+        cdef int random_index
+        cdef int[:] cur_loc
+        cdef int num_choices, random_choice
+        cdef int[:] new_loc
+        cdef int num_free, new_label
+        cdef int l
+        cdef int neighbor_id
+        cdef int two_d_index
+        cdef int index_to_remove
+
         if self.iterations_run < self.max_iterations:
             for iteration in range(num_iterations):
                 # Choose what type of cell to divide
@@ -182,12 +203,13 @@ cdef class Rough_Front(object):
                 # We have to check who is on the four squares around the interface
                 new_neighbors_loc = self.get_nearby_locations(new_loc)
 
-                for l in new_neighbors_loc:
-                    neighbor_id = self.lattice[l[0], l[1]]
+                for l in range(len(new_neighbors_loc)):
+                    loc = new_neighbors_loc[l]
+                    neighbor_id = self.lattice[loc[0], loc[1]]
                     if neighbor_id != -1:
-                        two_d_index = l[1] * self.nx + l[0]
+                        two_d_index = loc[1] * self.nx + loc[0]
                         if two_d_index in self.strain_labels[neighbor_id]:
-                            num_free, _ = self.get_nearby_empty_locations(l)
+                            num_free, _ = self.get_nearby_empty_locations(loc)
                             if num_free == 0:
                                 # Remove from interface
                                 index_to_remove = self.strain_labels[neighbor_id].index(two_d_index)
