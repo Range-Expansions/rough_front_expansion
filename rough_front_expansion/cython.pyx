@@ -1,3 +1,10 @@
+#cython: profile=False
+#cython: boundscheck=False
+#cython: initializedcheck=False
+#cython: nonecheck=False
+#cython: wraparound=False
+#cython: cdivision=True
+
 import numpy as np
 cimport numpy as np
 import skimage as ski
