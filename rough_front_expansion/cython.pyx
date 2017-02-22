@@ -3,9 +3,9 @@ import skimage as ski
 import skimage.morphology
 
 # The lattice we are using; right now, square, but should probably upgrade to a 9-point lattice
-cx = np.array([1, 0, -1, 0], dtype=np.int32)
-cy = np.array([0, 1, 0, -1], dtype=np.int32)
-num_neighbors = 4
+cdef int[:] cx = np.array([1, 0, -1, 0], dtype=np.int32)
+cdef int[:] cy = np.array([0, 1, 0, -1], dtype=np.int32)
+cdef int num_neighbors = 4
 
 cdef class Rough_Front(object):
 
@@ -76,12 +76,13 @@ cdef class Rough_Front(object):
 
     def get_nearby_empty_locations(self, cur_loc):
 
-        cur_x = cur_loc[0]
-        cur_y = cur_loc[1]
+        cdef int cur_x = cur_loc[0]
+        cdef int cur_y = cur_loc[1]
 
-        num_choices = 0
-        choices_to_occupy = []
+        cdef int num_choices = 0
+        cdef list choices_to_occupy = []
 
+        cdef int n
         for n in range(num_neighbors):
             cur_cx = cx[n]
             cur_cy = cy[n]
