@@ -7,7 +7,23 @@ cx = np.array([1, 0, -1, 0], dtype=np.int32)
 cy = np.array([0, 1, 0, -1], dtype=np.int32)
 num_neighbors = 4
 
-class Rough_Front(object):
+cdef class Rough_Front(object):
+
+    cdef public:
+        int nx
+        int ny
+        int num_strains
+        int[:] ic
+        double[:] v
+        int[:, :] lattice
+        list strain_positions
+        list strain_labels
+        int[:] N
+        double[:] weights
+        int[:] strain_array
+        int max_iterations
+        int iterations_run
+
 
     def __init__(self, nx, ny, num_strains=2, ic = None, v=None):
         self.nx = nx # Dimension of the lattice in the x (row) direction
@@ -24,11 +40,11 @@ class Rough_Front(object):
         else:
             self.ic = ic
 
-        self.lattice = -1*np.ones((self.nx, self.ny), dtype=np.int)
+        self.lattice = -1*np.ones((self.nx, self.ny), dtype=np.int32)
         self.lattice[:, 0] = self.ic
 
         # Get the original location of the interface
-        background = (self.lattice == -1)
+        background = (np.asarray(self.lattice) == -1)
         grown = ski.morphology.binary_dilation(background)  # Cross dilation
         interface = grown != background
         interface = np.where(interface)
@@ -41,7 +57,7 @@ class Rough_Front(object):
             self.strain_positions.append([])
             self.strain_labels.append([])
 
-        self.N = np.zeros(num_strains) # Number of each type of strain at the interface
+        self.N = np.zeros(num_strains, dtype=np.int32) # Number of each type of strain at the interface
         for cur_loc in interface_loc:
             cur_strain = self.lattice[cur_loc[0], cur_loc[1]]
             self.N[cur_strain] += 1
@@ -51,10 +67,10 @@ class Rough_Front(object):
             self.strain_labels[cur_strain].append(cur_loc[1] * nx + cur_loc[0])
 
         self.weights = np.zeros(num_strains, dtype=np.double) # The weight to draw each type of strain
-        self.strain_array = np.arange(num_strains, dtype=np.int) # The name of every strain; i.e. 0->num_strains - 1
+        self.strain_array = np.arange(num_strains, dtype=np.int32) # The name of every strain; i.e. 0->num_strains - 1
 
         # Get the maximum possible number of iterations...don't want to run longer than that!
-        self.max_iterations = np.sum(self.lattice == -1)
+        self.max_iterations = np.sum(np.asarray(self.lattice) == -1)
         self.iterations_run = 0
 
 
@@ -117,6 +133,7 @@ class Rough_Front(object):
         return choices_to_occupy
 
     def run(self, num_iterations):
+        normalized_weights = self.weights.copy()
         if self.iterations_run < self.max_iterations:
             for iteration in range(num_iterations):
                 # Choose what type of cell to divide
@@ -127,7 +144,8 @@ class Rough_Front(object):
 
                     self.weights[strain] = cur_weight
                     sum_of_weights += cur_weight
-                normalized_weights = self.weights / sum_of_weights
+                for strain  in range(self.num_strains):
+                    normalized_weights[strain] = self.weights[strain] / sum_of_weights
 
                 chosen_type = np.random.choice(self.strain_array, p=normalized_weights)
 
