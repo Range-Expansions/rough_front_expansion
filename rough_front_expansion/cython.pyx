@@ -10,6 +10,8 @@ cimport numpy as np
 import skimage as ski
 import skimage.morphology
 
+from cython_gsl cimport *
+
 # The lattice we are using; right now, square, but should probably upgrade to a 9-point lattice
 cdef int[:] cx = np.array([1, 0, -1, 0], dtype=np.int32)
 cdef int[:] cy = np.array([0, 1, 0, -1], dtype=np.int32)
@@ -32,6 +34,16 @@ cdef class Rough_Front(object):
         int max_iterations
         int iterations_run
 
+    cdef gsl_rng *random_generator
+
+    def __cinit__(self, unsigned long int seed = 0, **kwargs):
+        self.seed = seed
+        cdef gsl_rng *r = gsl_rng_alloc(gsl_rng_mt19937)
+        gsl_rng_set(r, self.seed)
+        self.random_generator = r
+
+    def __dealloc__(self):
+        gsl_rng_free(self.random_generator)
 
     def __init__(self, nx, ny, num_strains=2, ic = None, v=None):
         self.nx = nx # Dimension of the lattice in the x (row) direction
@@ -144,6 +156,22 @@ cdef class Rough_Front(object):
                 choices_to_occupy.append(np.array([streamed_x, streamed_y], dtype=np.int32))
 
         return choices_to_occupy
+
+    cdef unsigned int weighted_choice(self, double[:] weights, int[:] arr):
+        cdef double rand_num = gsl_rng_uniform(self.random_generator)
+
+        cdef double cur_sum = 0
+        cdef unsigned int index = 0
+
+        # Normalize the fitnesses
+
+        cdef double normalized_sum = 0
+
+        for index in range(arr.shape[0]):
+            cur_sum += weights[index]
+
+            if cur_sum > rand_num:
+                return index
 
     def run(self, int num_iterations):
 
