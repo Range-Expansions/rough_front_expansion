@@ -95,17 +95,19 @@ cdef class Rough_Front(object):
         self.iterations_run = 0
 
 
-    cdef get_nearby_empty_locations(self, int[:] cur_loc):
-
-        cdef int cur_x = cur_loc[0]
-        cdef int cur_y = cur_loc[1]
-
-        cdef int num_choices = 0
-        cdef list choices_to_occupy = []
+    cdef get_nearby_empty_locations(self, int cur_x, int cur_y,
+                                    int *x_choices, int *y_choices,
+                                    int *num_choices):
+        """
+        x_choices, y_choices: pointers to an array with the size of num_neighbors
+        num_choices: the number of possible choices
+        """
 
         cdef int n
         cdef int cur_cx, cur_cy, streamed_x, streamed_y
         cdef int neighboring_strain
+
+        num_choices = 0
 
         for n in range(num_neighbors):
             cur_cx = cx[n]
@@ -126,10 +128,9 @@ cdef class Rough_Front(object):
                 neighboring_strain = self.lattice[streamed_x, streamed_y]
 
                 if neighboring_strain == -1:
+                    x_choices[num_choices] = streamed_x
+                    y_choices[num_choices] = streamed_y
                     num_choices += 1
-                    choices_to_occupy.append(np.array([streamed_x, streamed_y], dtype=np.int32))
-
-        return num_choices, choices_to_occupy
 
     cdef get_nearby_locations(self, int[:] cur_loc):
 
@@ -182,7 +183,7 @@ cdef class Rough_Front(object):
         cdef int chosen_type
         cdef int random_index
         cdef int[:] cur_loc
-        cdef int num_choices, random_choice
+        cdef random_choice
         cdef int[:] new_loc
         cdef int num_free, new_label
         cdef int l
@@ -192,6 +193,10 @@ cdef class Rough_Front(object):
         cdef int index_to_remove
 
         cdef int choice_index
+
+        cdef int[4] x_choices = np.zeros(4, dtype=np.int32)
+        cdef int[4] y_choices = np.zeros(4, dtype=np.int32)
+        cdef int num_choices
 
         if self.iterations_run < self.max_iterations:
             for iteration in range(num_iterations):
@@ -215,7 +220,8 @@ cdef class Rough_Front(object):
                 cur_loc = self.strain_positions[chosen_type][random_index]
 
                 # Check where you can reproduce
-                num_choices, choices_to_occupy = self.get_nearby_empty_locations(cur_loc)
+                self.get_nearby_empty_locations(cur_loc[0], cur_loc[1],
+                                                &x_choices[0], &y_choices[0], &num_choices)
 
                 if num_choices == 0:
                     print 'Something bad has happened...'
@@ -223,14 +229,16 @@ cdef class Rough_Front(object):
                     print cur_loc[1] * self.nx + cur_loc[0]
 
                 random_choice = gsl_rng_uniform_int(self.random_generator, num_choices)
-                new_loc = choices_to_occupy[random_choice]
+                new_loc_x = x_choices[random_choice]
+                new_loc_y = y_choices[random_choice]
 
                 # Now update the lattice
-                self.lattice[new_loc[0], new_loc[1]] = chosen_type
+                self.lattice[new_loc_x, new_loc_y] = chosen_type
 
                 # Uh oh... you have to check if *you* are on the interface now!
-                num_free, _ = self.get_nearby_empty_locations(new_loc)
-                if num_free != 0:
+                self.get_nearby_empty_locations(new_loc[0], new_loc[1],
+                                                &x_choices[0], &y_choices[0], &num_choices)
+                if num_choices != 0:
                     new_label = new_loc[1] * self.nx + new_loc[0]
 
                     self.strain_labels[chosen_type].append(new_label)
@@ -247,8 +255,9 @@ cdef class Rough_Front(object):
                     if neighbor_id != -1:
                         two_d_index = loc[1] * self.nx + loc[0]
                         if two_d_index in self.strain_labels[neighbor_id]:
-                            num_free, _ = self.get_nearby_empty_locations(loc)
-                            if num_free == 0:
+                            self.get_nearby_empty_locations(new_loc[0], new_loc[1],
+                                                            &x_choices[0], &y_choices[0], &num_choices)
+                            if num_choices == 0:
                                 # Remove from interface
                                 index_to_remove = self.strain_labels[neighbor_id].index(two_d_index)
                                 del self.strain_labels[neighbor_id][index_to_remove]
