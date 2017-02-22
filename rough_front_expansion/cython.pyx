@@ -34,6 +34,7 @@ cdef class Rough_Front(object):
         int max_iterations
         int iterations_run
 
+    cdef public unsigned long int seed
     cdef gsl_rng *random_generator
 
     def __cinit__(self, unsigned long int seed = 0, **kwargs):
@@ -45,7 +46,7 @@ cdef class Rough_Front(object):
     def __dealloc__(self):
         gsl_rng_free(self.random_generator)
 
-    def __init__(self, nx, ny, num_strains=2, ic = None, v=None):
+    def __init__(self, nx=100, ny=100, num_strains=2, ic = None, v=None, **kwargs):
         self.nx = nx # Dimension of the lattice in the x (row) direction
         self.ny = ny # Dimension of the lattice in the y (column) direction
 
@@ -157,18 +158,16 @@ cdef class Rough_Front(object):
 
         return choices_to_occupy
 
-    cdef unsigned int weighted_choice(self, double[:] weights, int[:] arr):
+    cdef unsigned int weighted_choice(self, double[:] normalized_weights):
         cdef double rand_num = gsl_rng_uniform(self.random_generator)
 
         cdef double cur_sum = 0
         cdef unsigned int index = 0
 
-        # Normalize the fitnesses
-
         cdef double normalized_sum = 0
 
-        for index in range(arr.shape[0]):
-            cur_sum += weights[index]
+        for index in range(normalized_weights.shape[0]):
+            cur_sum += normalized_weights[index]
 
             if cur_sum > rand_num:
                 return index
@@ -191,6 +190,8 @@ cdef class Rough_Front(object):
         cdef int two_d_index
         cdef int index_to_remove
 
+        cdef int choice_index
+
         if self.iterations_run < self.max_iterations:
             for iteration in range(num_iterations):
                 # Choose what type of cell to divide
@@ -204,10 +205,11 @@ cdef class Rough_Front(object):
                 for strain  in range(self.num_strains):
                     normalized_weights[strain] = self.weights[strain] / sum_of_weights
 
-                chosen_type = np.random.choice(self.strain_array, p=normalized_weights)
+                choice_index = self.weighted_choice(normalized_weights)
+                chosen_type = self.strain_array[choice_index]
 
                 # Now that we have the type to choose, choose that type at random
-                random_index = np.random.randint(0, self.N[chosen_type])
+                random_index = gsl_rng_uniform_int(self.random_generator, self.N[chosen_type])
 
                 cur_loc = self.strain_positions[chosen_type][random_index]
 
@@ -219,7 +221,7 @@ cdef class Rough_Front(object):
                     print cur_loc
                     print cur_loc[1] * self.nx + cur_loc[0]
 
-                random_choice = np.random.randint(0, num_choices)
+                random_choice = gsl_rng_uniform_int(self.random_generator, num_choices)
                 new_loc = choices_to_occupy[random_choice]
 
                 # Now update the lattice
