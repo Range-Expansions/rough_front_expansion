@@ -158,7 +158,7 @@ cdef class Rough_Front(object):
 
         return choices_to_occupy
 
-    cdef unsigned int weighted_choice(self, double[:] normalized_weights):
+    cdef unsigned int weighted_choice(self, double[:] normalized_weights) nogil:
         cdef double rand_num = gsl_rng_uniform(self.random_generator)
 
         cdef double cur_sum = 0
@@ -186,6 +186,7 @@ cdef class Rough_Front(object):
         cdef int[:] new_loc
         cdef int num_free, new_label
         cdef int l
+        cdef int[:] loc
         cdef int neighbor_id
         cdef int two_d_index
         cdef int index_to_remove
