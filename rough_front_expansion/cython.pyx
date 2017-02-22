@@ -1,10 +1,3 @@
-#cython: profile=False
-#cython: boundscheck=False
-#cython: initializedcheck=False
-#cython: nonecheck=False
-#cython: wraparound=False
-#cython: cdivision=True
-
 import numpy as np
 cimport numpy as np
 import skimage as ski
@@ -26,7 +19,8 @@ cdef class Rough_Front(object):
         int[:] ic
         double[:] v
         int[:, :] lattice
-        list strain_positions
+        list strain_positions_x
+        list strain_positions_y
         list strain_labels
         int[:] N
         double[:] weights
@@ -72,10 +66,12 @@ cdef class Rough_Front(object):
 
         interface_loc = np.stack(interface, axis=1).astype(np.int32)
 
-        self.strain_positions = [] # Locations of each type of strain
+        self.strain_positions_x = [] # Locations of each type of strain
+        self.strain_positions_y = []
         self.strain_labels = [] # A unique, position-based label for each strain
         for _ in range(num_strains):
-            self.strain_positions.append([])
+            self.strain_positions_x.append([])
+            self.strain_positions_y.append([])
             self.strain_labels.append([])
 
         self.N = np.zeros(num_strains, dtype=np.int32) # Number of each type of strain at the interface
@@ -83,7 +79,8 @@ cdef class Rough_Front(object):
             cur_strain = self.lattice[cur_loc[0], cur_loc[1]]
             self.N[cur_strain] += 1
 
-            self.strain_positions[cur_strain].append(cur_loc)
+            self.strain_positions_x[cur_strain].append(cur_loc[0])
+            self.strain_positions_y[cur_strain].append(cur_loc[1])
 
             self.strain_labels[cur_strain].append(cur_loc[1] * nx + cur_loc[0])
 
@@ -95,7 +92,7 @@ cdef class Rough_Front(object):
         self.iterations_run = 0
 
 
-    cdef get_nearby_empty_locations(self, int cur_x, int cur_y,
+    cdef void get_nearby_empty_locations(self, int cur_x, int cur_y,
                                     int *x_choices, int *y_choices,
                                     int *num_choices):
         """
@@ -107,7 +104,7 @@ cdef class Rough_Front(object):
         cdef int cur_cx, cur_cy, streamed_x, streamed_y
         cdef int neighboring_strain
 
-        num_choices = 0
+        cdef int temp_num_choices = 0
 
         for n in range(num_neighbors):
             cur_cx = cx[n]
@@ -128,18 +125,27 @@ cdef class Rough_Front(object):
                 neighboring_strain = self.lattice[streamed_x, streamed_y]
 
                 if neighboring_strain == -1:
-                    x_choices[num_choices] = streamed_x
-                    y_choices[num_choices] = streamed_y
-                    num_choices += 1
+                    x_choices[temp_num_choices] = streamed_x
+                    y_choices[temp_num_choices] = streamed_y
+                    temp_num_choices += 1
+        num_choices[0] = temp_num_choices
 
-    cdef get_nearby_locations(self, int[:] cur_loc):
+    cdef void get_nearby_locations(self, int cur_x, int cur_y,
+                                   int *x_choices, int *y_choices,
+                                   int *num_choices):
+        """
+        x_choices, y_choices: pointers to an array with the size of num_neighbors
+        num_choices: the number of possible choices.
 
-        cdef int cur_x = cur_loc[0]
-        cdef int cur_y = cur_loc[1]
+        Gets all nearby locations.
+        """
 
-        choices_to_occupy = []
+        cdef int n
+        cdef int cur_cx, cur_cy, streamed_x, streamed_y
+        cdef int neighboring_strain
 
-        cdef int n, cur_cx, cur_cy, streamed_x, streamed_y
+        cdef int temp_num_choices = 0
+
         for n in range(num_neighbors):
             cur_cx = cx[n]
             cur_cy = cy[n]
@@ -155,9 +161,12 @@ cdef class Rough_Front(object):
                 streamed_x = self.nx - 1
 
             if not (streamed_y == self.ny or streamed_y == -1):
-                choices_to_occupy.append(np.array([streamed_x, streamed_y], dtype=np.int32))
 
-        return choices_to_occupy
+                x_choices[temp_num_choices] = streamed_x
+                y_choices[temp_num_choices] = streamed_y
+                temp_num_choices += 1
+
+        num_choices[0] = temp_num_choices
 
     cdef unsigned int weighted_choice(self, double[:] normalized_weights) nogil:
         cdef double rand_num = gsl_rng_uniform(self.random_generator)
@@ -196,7 +205,8 @@ cdef class Rough_Front(object):
 
         cdef int[4] x_choices = np.zeros(4, dtype=np.int32)
         cdef int[4] y_choices = np.zeros(4, dtype=np.int32)
-        cdef int num_choices
+        cdef int num_choices = 0
+        cdef int num_neighbors = 0
 
         if self.iterations_run < self.max_iterations:
             for iteration in range(num_iterations):
@@ -217,16 +227,19 @@ cdef class Rough_Front(object):
                 # Now that we have the type to choose, choose that type at random
                 random_index = gsl_rng_uniform_int(self.random_generator, self.N[chosen_type])
 
-                cur_loc = self.strain_positions[chosen_type][random_index]
+                cur_loc_x = self.strain_positions_x[chosen_type][random_index]
+                cur_loc_y = self.strain_positions_y[chosen_type][random_index]
 
                 # Check where you can reproduce
-                self.get_nearby_empty_locations(cur_loc[0], cur_loc[1],
+                self.get_nearby_empty_locations(cur_loc_x, cur_loc_y,
                                                 &x_choices[0], &y_choices[0], &num_choices)
+                if num_choices == 0 or num_choices >4:
+                    print 'FUCK'
 
                 if num_choices == 0:
                     print 'Something bad has happened...'
-                    print cur_loc
-                    print cur_loc[1] * self.nx + cur_loc[0]
+                    print cur_loc_x, cur_loc_y
+                    print cur_loc_y * self.nx + cur_loc_x
 
                 random_choice = gsl_rng_uniform_int(self.random_generator, num_choices)
                 new_loc_x = x_choices[random_choice]
@@ -236,32 +249,39 @@ cdef class Rough_Front(object):
                 self.lattice[new_loc_x, new_loc_y] = chosen_type
 
                 # Uh oh... you have to check if *you* are on the interface now!
-                self.get_nearby_empty_locations(new_loc[0], new_loc[1],
+                self.get_nearby_empty_locations(new_loc_x, new_loc_y,
                                                 &x_choices[0], &y_choices[0], &num_choices)
-                if num_choices != 0:
-                    new_label = new_loc[1] * self.nx + new_loc[0]
+                if num_choices != 0: # Need to update the front
+                    new_label = new_loc_y * self.nx + new_loc_x
 
                     self.strain_labels[chosen_type].append(new_label)
-                    self.strain_positions[chosen_type].append(new_loc)
+                    self.strain_positions_x[chosen_type].append(new_loc_x)
+                    self.strain_positions_y[chosen_type].append(new_loc_y)
+
                     self.N[chosen_type] += 1
 
                 # Now update who is on the edge of the interface.
                 # We have to check who is on the four squares around the interface
-                new_neighbors_loc = self.get_nearby_locations(new_loc)
+                self.get_nearby_locations(new_loc_x, new_loc_y,
+                                          &x_choices[0], &y_choices[0], &num_neighbors)
 
-                for l in range(len(new_neighbors_loc)):
-                    loc = new_neighbors_loc[l]
-                    neighbor_id = self.lattice[loc[0], loc[1]]
+                for l in range(num_neighbors):
+                    neighbor_loc_x = x_choices[l]
+                    neighbor_loc_y = y_choices[l]
+
+                    neighbor_id = self.lattice[neighbor_loc_x, neighbor_loc_y]
                     if neighbor_id != -1:
-                        two_d_index = loc[1] * self.nx + loc[0]
+                        two_d_index = neighbor_loc_y * self.nx + neighbor_loc_x
                         if two_d_index in self.strain_labels[neighbor_id]:
-                            self.get_nearby_empty_locations(new_loc[0], new_loc[1],
+                            self.get_nearby_empty_locations(neighbor_loc_x, neighbor_loc_y,
                                                             &x_choices[0], &y_choices[0], &num_choices)
                             if num_choices == 0:
                                 # Remove from interface
                                 index_to_remove = self.strain_labels[neighbor_id].index(two_d_index)
                                 del self.strain_labels[neighbor_id][index_to_remove]
-                                del self.strain_positions[neighbor_id][index_to_remove]
+                                del self.strain_positions_x[neighbor_id][index_to_remove]
+                                del self.strain_positions_y[neighbor_id][index_to_remove]
+
                                 self.N[neighbor_id] -= 1
 
                 self.iterations_run += 1
