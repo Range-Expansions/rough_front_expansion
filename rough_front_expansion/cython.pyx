@@ -182,6 +182,10 @@ cdef class Rough_Front(object):
             if cur_sum > rand_num:
                 return index
 
+    cdef gsl_rng_uniform_int_safe(self, int max):
+        print max
+        return gsl_rng_uniform_int(self.random_generator, max)
+
     def run(self, int num_iterations):
 
         cdef double[:] normalized_weights = self.weights.copy()
@@ -225,7 +229,7 @@ cdef class Rough_Front(object):
                 chosen_type = self.strain_array[choice_index]
 
                 # Now that we have the type to choose, choose that type at random
-                random_index = gsl_rng_uniform_int(self.random_generator, self.N[chosen_type])
+                random_index = self.gsl_rng_uniform_int_safe(self.N[chosen_type])
 
                 cur_loc_x = self.strain_positions_x[chosen_type][random_index]
                 cur_loc_y = self.strain_positions_y[chosen_type][random_index]
@@ -233,15 +237,8 @@ cdef class Rough_Front(object):
                 # Check where you can reproduce
                 self.get_nearby_empty_locations(cur_loc_x, cur_loc_y,
                                                 &x_choices[0], &y_choices[0], &num_choices)
-                if num_choices == 0 or num_choices >4:
-                    print 'FUCK'
 
-                if num_choices == 0:
-                    print 'Something bad has happened...'
-                    print cur_loc_x, cur_loc_y
-                    print cur_loc_y * self.nx + cur_loc_x
-
-                random_choice = gsl_rng_uniform_int(self.random_generator, num_choices)
+                random_choice = self.gsl_rng_uniform_int_safe(num_choices)
                 new_loc_x = x_choices[random_choice]
                 new_loc_y = y_choices[random_choice]
 
@@ -251,6 +248,7 @@ cdef class Rough_Front(object):
                 # Uh oh... you have to check if *you* are on the interface now!
                 self.get_nearby_empty_locations(new_loc_x, new_loc_y,
                                                 &x_choices[0], &y_choices[0], &num_choices)
+
                 if num_choices != 0: # Need to update the front
                     new_label = new_loc_y * self.nx + new_loc_x
 
@@ -275,6 +273,7 @@ cdef class Rough_Front(object):
                         if two_d_index in self.strain_labels[neighbor_id]:
                             self.get_nearby_empty_locations(neighbor_loc_x, neighbor_loc_y,
                                                             &x_choices[0], &y_choices[0], &num_choices)
+
                             if num_choices == 0:
                                 # Remove from interface
                                 index_to_remove = self.strain_labels[neighbor_id].index(two_d_index)
