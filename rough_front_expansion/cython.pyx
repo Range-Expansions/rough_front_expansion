@@ -1,3 +1,10 @@
+#cython: profile=False
+#cython: boundscheck=False
+#cython: initializedcheck=False
+#cython: nonecheck=False
+#cython: wraparound=False
+#cython: cdivision=True
+
 import numpy as np
 cimport numpy as np
 import skimage as ski
@@ -102,7 +109,7 @@ cdef class Rough_Front(object):
 
     cdef void get_nearby_empty_locations(self, int cur_x, int cur_y,
                                     int *x_choices, int *y_choices,
-                                    int *num_choices):
+                                    int *num_choices) nogil:
         """
         x_choices, y_choices: pointers to an array with the size of num_neighbors
         num_choices: the number of possible choices
@@ -141,7 +148,7 @@ cdef class Rough_Front(object):
 
     cdef void get_nearby_locations(self, int cur_x, int cur_y,
                                    int *x_choices, int *y_choices,
-                                   int *num_choices):
+                                   int *num_choices) nogil:
         """
         x_choices, y_choices: pointers to an array with the size of num_neighbors
         num_choices: the number of possible choices.
@@ -220,6 +227,8 @@ cdef class Rough_Front(object):
 
         cdef int num_choices = 0
         cdef int num_neighbors = 0
+
+        cdef int new_loc_x, new_loc_y, cur_loc_x, cur_loc_y
 
         if self.iterations_run < self.max_iterations:
             for iteration in range(num_iterations):
