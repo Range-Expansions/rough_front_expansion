@@ -4,11 +4,15 @@ import skimage as ski
 import skimage.morphology
 
 from cython_gsl cimport *
+from cpython cimport bool
+
 
 # The lattice we are using; right now, square, but should probably upgrade to a 9-point lattice
 cdef int[:] cx = np.array([1, 0, -1, 0], dtype=np.int32)
 cdef int[:] cy = np.array([0, 1, 0, -1], dtype=np.int32)
 cdef int num_neighbors = 4
+
+
 
 cdef class Rough_Front(object):
 
@@ -28,6 +32,8 @@ cdef class Rough_Front(object):
         int max_iterations
         int iterations_run
 
+        bool debug
+
     cdef public unsigned long int seed
     cdef gsl_rng *random_generator
 
@@ -40,9 +46,11 @@ cdef class Rough_Front(object):
     def __dealloc__(self):
         gsl_rng_free(self.random_generator)
 
-    def __init__(self, nx=100, ny=100, num_strains=2, ic = None, v=None, **kwargs):
+    def __init__(self, nx=100, ny=100, num_strains=2, ic = None, v=None, debug=False, **kwargs):
         self.nx = nx # Dimension of the lattice in the x (row) direction
         self.ny = ny # Dimension of the lattice in the y (column) direction
+
+        self.debug = debug
 
         self.num_strains = num_strains # Number of different strains in the simulation
         if v is None:
@@ -206,12 +214,19 @@ cdef class Rough_Front(object):
 
         cdef int[4] x_choices = np.zeros(4, dtype=np.int32)
         cdef int[4] y_choices = np.zeros(4, dtype=np.int32)
+
+        cdef int[4] neighbor_x_choices = np.zeros(4, dtype=np.int32)
+        cdef int[4] neighbor_y_choices = np.zeros(4, dtype=np.int32)
+
         cdef int num_choices = 0
         cdef int num_neighbors = 0
 
         if self.iterations_run < self.max_iterations:
             for iteration in range(num_iterations):
                 # Choose what type of cell to divide
+
+                if self.debug:
+                    print 'POINT A'
 
                 sum_of_weights = 0
                 for strain in range(self.num_strains):
@@ -255,6 +270,9 @@ cdef class Rough_Front(object):
 
                     self.N[chosen_type] += 1
 
+                if self.debug:
+                    print 'POINT B'
+
                 # Now update who is on the edge of the interface.
                 # We have to check who is on the four squares around the interface
                 self.get_nearby_locations(new_loc_x, new_loc_y,
@@ -269,7 +287,7 @@ cdef class Rough_Front(object):
                         two_d_index = neighbor_loc_y * self.nx + neighbor_loc_x
                         if two_d_index in self.strain_labels[neighbor_id]:
                             self.get_nearby_empty_locations(neighbor_loc_x, neighbor_loc_y,
-                                                            &x_choices[0], &y_choices[0], &num_choices)
+                                                            &neighbor_x_choices[0], &neighbor_y_choices[0], &num_choices)
 
                             if num_choices == 0:
                                 # Remove from interface
