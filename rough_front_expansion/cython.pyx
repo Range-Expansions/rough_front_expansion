@@ -316,7 +316,7 @@ cdef class Rough_Front(object):
         else:
             print 'I already ran for the maximum number of iterations! Done.'
 
-    def get_wall_df(self, ii, jj, expansion_size = 3):
+    def get_wall_df(self, ii, jj, expansion_size = 3, single_sector=False, collision_offset=5):
 
         frozen_field = np.asarray(self.lattice)
 
@@ -335,6 +335,14 @@ cdef class Rough_Front(object):
         walls = expanded_pops[:, :, ii] * expanded_pops[:, :, jj]
 
         labeled_walls = ski.measure.label(walls, connectivity=2)
+
+        if single_sector:
+            if labeled_walls.max() == 1: # Walls collided...need to split the data
+                print 'Domain walls must have collided...fixing the labels...'
+                r, c = np.where(walls)
+                max_c = np.max(c)
+                new_label_image = walls[:, max_c - collision_offset]
+                labeled_walls = ski.measure.label(walls, connectivity=2)
 
         df_list = []
 
