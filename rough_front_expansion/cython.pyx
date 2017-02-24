@@ -13,13 +13,13 @@ import skimage.morphology
 from cython_gsl cimport *
 from cpython cimport bool
 
+import pandas as pd
+
 
 # The lattice we are using; right now, square, but should probably upgrade to a 9-point lattice
 cdef int[:] cx = np.array([1, 0, -1, 0], dtype=np.int32)
 cdef int[:] cy = np.array([0, 1, 0, -1], dtype=np.int32)
 cdef int num_neighbors = 4
-
-
 
 cdef class Rough_Front(object):
 
@@ -313,3 +313,39 @@ cdef class Rough_Front(object):
                     break
         else:
             print 'I already ran for the maximum number of iterations! Done.'
+
+    def get_wall_df(self, ii, jj, expansion_size = 3):
+
+        frozen_field = self.lattice
+
+        frozen_pops = np.zeros((frozen_field.shape[0], frozen_field.shape[1], self.num_strains), dtype=np.bool)
+        for i in range(self.num_strains):
+            frozen_pops[:, :, i] = (frozen_field == i)
+
+        expanded_pops = np.zeros_like(frozen_pops)
+
+        expander = ski.morphology.disk(expansion_size)
+
+        for i in range(self.num_strains):
+            cur_slice = frozen_pops[:, :, i]
+            expanded_pops[:, :, i] = ski.morphology.binary_dilation(cur_slice, selem=expander)
+
+        walls = expanded_pops[:, :, ii] * expanded_pops[:, :, jj]
+
+        labeled_walls = ski.measure.label(walls, connectivity=2)
+
+        df_list = []
+
+        for cur_label in range(1, np.max(labeled_walls) + 1):
+            r, c = np.where(labeled_walls == cur_label)
+
+            df = pd.DataFrame(data={'i': ii, 'j': jj, 'label_num': cur_label, 'r': r, 'c': c})
+
+            # Group the df so that there is only one y for each x
+
+            #df = df.groupby('x').agg(np.mean).reset_index()
+
+            df_list.append(df)
+        if len(df_list) == 0:
+            return None
+        return pd.concat(df_list)
