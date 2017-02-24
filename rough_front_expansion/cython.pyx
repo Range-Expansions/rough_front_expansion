@@ -9,6 +9,8 @@ import numpy as np
 cimport numpy as np
 import skimage as ski
 import skimage.morphology
+import skimage.measure
+import matplotlib.pyplot as plt
 
 from cython_gsl cimport *
 from cpython cimport bool
@@ -316,7 +318,7 @@ cdef class Rough_Front(object):
 
     def get_wall_df(self, ii, jj, expansion_size = 3):
 
-        frozen_field = self.lattice
+        frozen_field = np.asarray(self.lattice)
 
         frozen_pops = np.zeros((frozen_field.shape[0], frozen_field.shape[1], self.num_strains), dtype=np.bool)
         for i in range(self.num_strains):
@@ -342,8 +344,6 @@ cdef class Rough_Front(object):
             df = pd.DataFrame(data={'i': ii, 'j': jj, 'label_num': cur_label, 'r': r, 'c': c})
 
             # Group the df so that there is only one y for each x
-
-            #df = df.groupby('x').agg(np.mean).reset_index()
 
             df_list.append(df)
         if len(df_list) == 0:
