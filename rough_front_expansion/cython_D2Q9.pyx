@@ -10,7 +10,6 @@ cimport numpy as np
 import skimage as ski
 import skimage.morphology
 import skimage.measure
-import matplotlib.pyplot as plt
 
 from cython_gsl cimport *
 from cpython cimport bool
