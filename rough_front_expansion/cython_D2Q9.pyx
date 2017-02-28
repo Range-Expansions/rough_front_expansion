@@ -21,9 +21,9 @@ import pandas as pd
 # The lattice we are using; right now, square, but should probably upgrade to a 9-point lattice
 cdef int[:] cx = np.array([1, 0, -1, 0, 1, -1, -1,  1], dtype=np.int32)
 cdef int[:] cy = np.array([0, 1, 0, -1, 1,  1, -1, -1], dtype=np.int32)
-dist = np.array([1., 1., 1., 1., 1./np.sqrt(2), 1./np.sqrt(2), 1./np.sqrt(2), 1./np.sqrt(2)], dtype=np.float)
-cdef float[:] weights = dist/np.sum(dist)
-cdef int NUM_NEIGHBORS = 8
+dist = np.array([1., 1., 1., 1., 1./np.sqrt(2), 1./np.sqrt(2), 1./np.sqrt(2), 1./np.sqrt(2)], dtype=np.double)
+cdef double[:] weights = dist/np.sum(dist)
+cdef int NUM_LATTICE_NEIGHBORS = 8
 
 cdef class Rough_Front(object):
 
@@ -79,7 +79,9 @@ cdef class Rough_Front(object):
 
         # Get the original location of the interface
         background = (np.asarray(self.lattice) == -1)
-        grown = ski.morphology.binary_dilation(background)  # Cross dilation
+        # Need to use 8-point dilation now
+        selem = ski.morphology.square(3)
+        grown = ski.morphology.binary_dilation(background, selem=selem)  # 8-point dilation
         interface = grown != background
         interface = np.where(interface)
 
@@ -125,7 +127,7 @@ cdef class Rough_Front(object):
 
         cdef int temp_num_choices = 0
 
-        for n in range(NUM_NEIGHBORS):
+        for n in range(NUM_LATTICE_NEIGHBORS):
             cur_cx = cx[n]
             cur_cy = cy[n]
 
@@ -166,7 +168,7 @@ cdef class Rough_Front(object):
 
         cdef int temp_num_choices = 0
 
-        for n in range(NUM_NEIGHBORS):
+        for n in range(NUM_LATTICE_NEIGHBORS):
             cur_cx = cx[n]
             cur_cy = cy[n]
 
@@ -223,11 +225,11 @@ cdef class Rough_Front(object):
 
         cdef int choice_index
 
-        cdef int[NUM_NEIGHBORS] x_choices = np.zeros(NUM_NEIGHBORS, dtype=np.int32)
-        cdef int[NUM_NEIGHBORS] y_choices = np.zeros(NUM_NEIGHBORS, dtype=np.int32)
+        cdef int[8] x_choices = np.zeros(8, dtype=np.int32) # I don't know how to declare a final constant in cython...lol
+        cdef int[8] y_choices = np.zeros(8, dtype=np.int32)
 
-        cdef int[NUM_NEIGHBORS] neighbor_x_choices = np.zeros(NUM_NEIGHBORS, dtype=np.int32)
-        cdef int[NUM_NEIGHBORS] neighbor_y_choices = np.zeros(NUM_NEIGHBORS, dtype=np.int32)
+        cdef int[8] neighbor_x_choices = np.zeros(8, dtype=np.int32)
+        cdef int[8] neighbor_y_choices = np.zeros(8, dtype=np.int32)
 
         cdef int num_choices = 0
         cdef int num_neighbors = 0
