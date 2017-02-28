@@ -5,6 +5,8 @@
 #cython: wraparound=False
 #cython: cdivision=True
 
+#TODO: NEED TO FIX WEIGHTS WHEN CHOOSING WHICH DIRECTION TO JUMP!
+
 import numpy as np
 cimport numpy as np
 import skimage as ski
