@@ -19,9 +19,11 @@ import pandas as pd
 
 
 # The lattice we are using; right now, square, but should probably upgrade to a 9-point lattice
-cdef int[:] cx = np.array([1, 0, -1, 0], dtype=np.int32)
-cdef int[:] cy = np.array([0, 1, 0, -1], dtype=np.int32)
-cdef int num_neighbors = 4
+cdef int[:] cx = np.array([1, 0, -1, 0, 1, -1, -1,  1], dtype=np.int32)
+cdef int[:] cy = np.array([0, 1, 0, -1, 1,  1, -1, -1], dtype=np.int32)
+dist = np.array([1., 1., 1., 1., 1./np.sqrt(2), 1./np.sqrt(2), 1./np.sqrt(2), 1./np.sqrt(2)], dtype=np.float)
+cdef float[:] weights = dist/np.sum(dist)
+cdef int NUM_NEIGHBORS = 8
 
 cdef class Rough_Front(object):
 
@@ -123,7 +125,7 @@ cdef class Rough_Front(object):
 
         cdef int temp_num_choices = 0
 
-        for n in range(num_neighbors):
+        for n in range(NUM_NEIGHBORS):
             cur_cx = cx[n]
             cur_cy = cy[n]
 
@@ -164,7 +166,7 @@ cdef class Rough_Front(object):
 
         cdef int temp_num_choices = 0
 
-        for n in range(num_neighbors):
+        for n in range(NUM_NEIGHBORS):
             cur_cx = cx[n]
             cur_cy = cy[n]
 
@@ -221,11 +223,11 @@ cdef class Rough_Front(object):
 
         cdef int choice_index
 
-        cdef int[4] x_choices = np.zeros(4, dtype=np.int32)
-        cdef int[4] y_choices = np.zeros(4, dtype=np.int32)
+        cdef int[NUM_NEIGHBORS] x_choices = np.zeros(NUM_NEIGHBORS, dtype=np.int32)
+        cdef int[NUM_NEIGHBORS] y_choices = np.zeros(NUM_NEIGHBORS, dtype=np.int32)
 
-        cdef int[4] neighbor_x_choices = np.zeros(4, dtype=np.int32)
-        cdef int[4] neighbor_y_choices = np.zeros(4, dtype=np.int32)
+        cdef int[NUM_NEIGHBORS] neighbor_x_choices = np.zeros(NUM_NEIGHBORS, dtype=np.int32)
+        cdef int[NUM_NEIGHBORS] neighbor_y_choices = np.zeros(NUM_NEIGHBORS, dtype=np.int32)
 
         cdef int num_choices = 0
         cdef int num_neighbors = 0

@@ -9,6 +9,11 @@ extensions = [
               sources=["rough_front_expansion/cython.pyx"],
               language="c", libraries = cython_gsl.get_libraries(),
               library_dirs = [cython_gsl.get_library_dir()],
+              include_dirs = [cython_gsl.get_cython_include_dir(), np.get_include()]),
+Extension("rough_front_expansion.cython_D2Q9",
+              sources=["rough_front_expansion/cython_D2Q9.pyx"],
+              language="c", libraries = cython_gsl.get_libraries(),
+              library_dirs = [cython_gsl.get_library_dir()],
               include_dirs = [cython_gsl.get_cython_include_dir(), np.get_include()])
 ]
 
