@@ -24,7 +24,6 @@ cdef int[:] cx = np.array([1, 0, -1, 0, 1, -1, -1,  1], dtype=np.int32)
 cdef int[:] cy = np.array([0, 1, 0, -1, 1,  1, -1, -1], dtype=np.int32)
 cdef double[:] lattice_distances = np.array([1., 1., 1., 1., np.sqrt(2), np.sqrt(2), np.sqrt(2), np.sqrt(2)],
                                             dtype=np.double)
-#cdef double[:] jump_weights = lattice_distances/np.sum(lattice_distances)
 cdef int NUM_LATTICE_NEIGHBORS = 8
 
 cdef class Rough_Front(object):
@@ -275,6 +274,8 @@ cdef class Rough_Front(object):
 
         cdef int new_loc_x, new_loc_y, cur_loc_x, cur_loc_y
 
+        cdef double dist_sum
+
         if self.iterations_run < self.max_iterations:
             for iteration in range(num_iterations):
                 # Choose what type of cell to divide
@@ -306,7 +307,7 @@ cdef class Rough_Front(object):
                                       &num_choices)
 
                 # Based on the distances, get the direction to jump
-                dist_sum = 0
+                dist_sum = 0.0
                 for i in range(num_choices):
                     dist_sum += distances[i]
                 cur_jump_weights = distances
