@@ -29,7 +29,7 @@ cdef class Rough_Front(object):
         int nx
         int ny
         int num_strains
-        int[:] ic
+        int[:, :] ic
         double[:] v
         int[:, :] lattice
         list strain_positions_x
@@ -73,7 +73,7 @@ cdef class Rough_Front(object):
             self.ic = ic
 
         self.lattice = -1*np.ones((self.nx, self.ny), dtype=np.int32)
-        self.lattice[:, 0] = self.ic
+        self.lattice[:, :] = self.ic
 
         # Get the original location of the interface
         background = (np.asarray(self.lattice) == -1)
