@@ -19,12 +19,12 @@ Extension("rough_front_expansion.cython_D2Q9",
 
 setup(
     name='rough_front_expansion',
-    version='',
+    version='0.1',
     packages=['rough_front_expansion'],
     url='',
     license='',
-    author='bryan',
-    author_email='bweinstein@seas.harvard.edu',
+    author='btweinstein',
+    author_email='btweinstein@gmail.com',
     description='',
     include_dirs = [cython_gsl.get_include(), np.get_include()],
     ext_modules = cythonize(extensions, annotate=True)
