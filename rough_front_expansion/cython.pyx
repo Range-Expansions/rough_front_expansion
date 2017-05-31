@@ -5,8 +5,6 @@
 #cython: wraparound=False
 #cython: cdivision=True
 
-#TODO: NEED TO FIX WEIGHTS WHEN CHOOSING WHICH DIRECTION TO JUMP!
-
 import numpy as np
 cimport numpy as np
 import skimage as ski
@@ -79,9 +77,8 @@ cdef class Rough_Front(object):
 
         # Get the original location of the interface
         background = (np.asarray(self.lattice) == -1)
-        # Use 4-point dilation now
-        selem = ski.morphology.square(2)
-        grown = ski.morphology.binary_dilation(background, selem=selem)  # 4-point dilation
+        # 4-point dilation now
+        grown = ski.morphology.binary_dilation(background)  # 4-point dilation
         interface = grown != background
         interface = np.where(interface)
 
